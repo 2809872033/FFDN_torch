@@ -23,11 +23,11 @@ mnist_dataset = datasets.MNIST('', train=True,
 train_set, valid_set = random_split(mnist_dataset, [50000, 10000])
 
 # Split validation set into validation and test sets
-valid_set, test_set = random_split(valid_set, [2000, 8000])
+valid_set, test_set = random_split(valid_set, [3000, 7000])
 #数据集载入
 train_set_loader = DataLoader(train_set, batch_size=batch_size)
 valid_set_loader = DataLoader(valid_set, batch_size=batch_size)
-
+test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False)
 #模型载入
 model = FusedFuzzyDeepNet(input_dim, fuzz_dim, num_class).to(device)
 # 最小验证loss定义
@@ -41,6 +41,7 @@ optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
 for epoch in range(epoch_num):
     # 对每个epoch，训练loss初始化为0
     train_loss = 0.0
+    model.train()
     for data, labels in train_set_loader:
         # 训练集加载后，将数据与标签传入gpu
         data, labels = data.to(device), labels.to(device)
@@ -58,26 +59,25 @@ for epoch in range(epoch_num):
         optimizer.step()
         # loss.item是将损失值进行标量化，计算的是一个batch size的平均损失
         # data.size(0)返回输入数据data的第一个维度的大小，即批次大小（batch size）。
-        train_loss = loss.item() * data.size(0)
+        train_loss += loss.item() * data.size(0)
 
     valid_loss = 0.0
     # 将模型设置为评估模式,在训练阶段，模型会根据训练数据进行参数更新和学习，以提高模型的性能。
     # 而在评估阶段，模型主要用于对新样本进行预测，并评估模型的性能。
     model.eval()
-
     for data, labels in valid_set_loader:
         data, labels = data.to(device), labels.to(device)
         #
         target = model(data)
         loss = criterion(target, labels)
-        valid_loss = loss.item() * data.size(0)
+        valid_loss += loss.item() * data.size(0)
 
+    train_loss /= len(train_set_loader.dataset)
+    valid_loss /= len(valid_set_loader.dataset)
     print('Epoch: {:d} - training loss: {:.6f} - validation loss: {:.6f}'.format(epoch, train_loss, valid_loss))
 
 # Set the model to evaluation mode
 model.eval()
-# Create a dataloader for the test dataset
-test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
 # Variables for tracking test loss and accuracy
 test_loss = 0.0
 correct_predictions = 0
